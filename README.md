@@ -83,9 +83,6 @@ npm run dev               # http://localhost:5173
 - ✅ Two-section frontend with two role-tagged chat boxes, connected to n8n
 - ✅ Dedicated Error Workflow + frontend error banner; hardened, jailbreak-resistant system prompt
 
-## Bonuses (not yet implemented)
-- B1 real roles/login · B2 vision-to-text auto-description · B3 multimodal visual search.
-
 ## Security note
 **RLS is enabled** on all tables. The app reaches the DB only through n8n's service-role key
 (which bypasses RLS), so the public anon key is locked out while everything keeps working.
