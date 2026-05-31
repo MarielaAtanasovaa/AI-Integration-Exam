@@ -1,0 +1,210 @@
+{
+  "name": "NovaDom - Match Buyer Query (semantic)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "search",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "91def733-32f6-479b-86cf-97ce1e2c91c6",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "novadom-search"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.body.query }] } }) }}",
+        "options": {}
+      },
+      "id": "cbcd25e7-7cb7-489e-a935-523b97140eb4",
+      "name": "Embed Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/match_property_vectors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query_embedding: JSON.stringify($json.embedding.values), match_count: 5, filter: {} }) }}",
+        "options": {}
+      },
+      "id": "6fa2fb9c-7fb6-4e46-a5a0-2bc871192a2b",
+      "name": "Match Vectors",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const THRESHOLD = 0.70;\nconst query = $('Webhook').first().json.body.query;\nconst rows = items.map(i => i.json).filter(r => r && typeof r.similarity === 'number');\nconst good = rows.filter(r => r.similarity >= THRESHOLD);\nif (good.length === 0) {\n  return [{ json: { matches: [], message: 'No listings closely match your search. Try different wording.', buyer_query: query, matched_property_ids: [] } }];\n}\nconst matches = good.map(r => ({\n  id: r.metadata.property_id,\n  title: r.metadata.title,\n  property_type: r.metadata.property_type,\n  listing_type: r.metadata.listing_type,\n  location: r.metadata.location,\n  price: r.metadata.price,\n  image_url: r.metadata.image_url || null,\n  description: r.content,\n  similarity: r.similarity\n}));\nreturn [{ json: { matches, message: '', buyer_query: query, matched_property_ids: matches.map(m => m.id) } }];"
+      },
+      "id": "a4e071f6-cdd2-46c1-a6a0-bdb645e2a074",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/inquiry_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ buyer_query: $json.buyer_query, matched_property_ids: $json.matched_property_ids }) }}",
+        "options": {}
+      },
+      "id": "ee49ea87-a44e-4fe7-8d32-49721897dc02",
+      "name": "Log Inquiry",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { matches: $('Format').first().json.matches, message: $('Format').first().json.message } }}",
+        "options": {}
+      },
+      "id": "b941fc0e-3da4-4ff2-b52c-ebe28ecb903b",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1104,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Embed Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Query": {
+      "main": [
+        [
+          {
+            "node": "Match Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Vectors": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Log Inquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Inquiry": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "QE5myWmaQCmcCpAS",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "acd258a5-2c56-4a30-998f-50984cd9b634",
+  "meta": {
+    "instanceId": "9f5d08ab6b97d69e6449885599b8675d0accb23577b5b533e2108defda49fa46"
+  },
+  "id": "YWS8DyyQIU5Sb58y",
+  "tags": []
+}

@@ -1,0 +1,316 @@
+{
+  "name": "NovaDom - Add Listing (broker)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "add-listing",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*",
+          "rawBody": false
+        }
+      },
+      "id": "33f03de5-c6b4-42f4-8368-5cc1fd63fc23",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        112
+      ],
+      "webhookId": "novadom-add-listing"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst safe = (s) => String(s || '').replace(/[^a-zA-Z0-9._-]/g, '_');\nconst out = {\n  title: body.title,\n  property_type: body.property_type,\n  listing_type: body.listing_type,\n  location: body.location,\n  price: Number(body.price),\n  description: body.description,\n  hasImage: false,\n  objectName: null,\n  imageUrl: null,\n  mimeType: null\n};\nconst result = { json: out };\nconst img = body.image;\nif (img && img.base64) {\n  const objectName = Date.now() + '_' + safe(img.filename || 'image');\n  out.hasImage = true;\n  out.objectName = objectName;\n  out.mimeType = img.mimeType || 'application/octet-stream';\n  out.imageUrl = $env.SUPABASE_URL + '/storage/v1/object/public/property-images/' + objectName;\n  result.binary = { data: { data: img.base64, mimeType: out.mimeType, fileName: objectName } };\n}\nreturn [result];"
+      },
+      "id": "defffa88-5845-4728-960d-c6eb9ef4168c",
+      "name": "Prep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-image",
+              "leftValue": "={{ $json.hasImage }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fc96e428-4361-4914-99cd-8545f37492a7",
+      "name": "Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/property-images/{{ $json.objectName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            },
+            {
+              "name": "Content-Type",
+              "value": "={{ $json.mimeType }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "c2784e50-dd7d-41d3-9c4e-7d0ec340eea8",
+      "name": "Upload Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/properties",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $('Prep').first().json.title, property_type: $('Prep').first().json.property_type, listing_type: $('Prep').first().json.listing_type, location: $('Prep').first().json.location, price: $('Prep').first().json.price, description: $('Prep').first().json.description, image_url: $('Prep').first().json.imageUrl }) }}",
+        "options": {}
+      },
+      "id": "941c212e-e4ad-4140-8882-7b76d4b4f6ad",
+      "name": "Insert Property",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $('Prep').first().json.description }] } }) }}",
+        "options": {}
+      },
+      "id": "3a765652-3095-4b23-882d-b9884764a96f",
+      "name": "Embed Description",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/property_vectors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $('Prep').first().json.description, metadata: { property_id: $('Insert Property').first().json.id, title: $('Prep').first().json.title, property_type: $('Prep').first().json.property_type, listing_type: $('Prep').first().json.listing_type, location: $('Prep').first().json.location, price: $('Prep').first().json.price, image_url: $('Prep').first().json.imageUrl }, embedding: JSON.stringify($json.embedding.values) }) }}",
+        "options": {}
+      },
+      "id": "937861b7-d13c-41dd-850e-fd3a529bd1f8",
+      "name": "Insert Vector",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, property: $('Insert Property').first().json } }}",
+        "options": {}
+      },
+      "id": "da01592a-0503-42f0-9d07-a665bc0023af",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "Has Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Upload Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Property",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image": {
+      "main": [
+        [
+          {
+            "node": "Insert Property",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Property": {
+      "main": [
+        [
+          {
+            "node": "Embed Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Description": {
+      "main": [
+        [
+          {
+            "node": "Insert Vector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Vector": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "QE5myWmaQCmcCpAS",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "50ffe2bc-aa59-4670-b352-a1d1c2c15c12",
+  "meta": {
+    "instanceId": "9f5d08ab6b97d69e6449885599b8675d0accb23577b5b533e2108defda49fa46"
+  },
+  "id": "BhkgfIRKEsYlQklr",
+  "tags": []
+}

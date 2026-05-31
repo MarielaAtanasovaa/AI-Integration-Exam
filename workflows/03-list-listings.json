@@ -1,0 +1,104 @@
+{
+  "name": "NovaDom - List Listings",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "list-listings",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "77f15000-732e-4b02-9d39-89cdebc0c666",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -128
+      ],
+      "webhookId": "novadom-list-listings"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/properties?select=*&order=created_at.desc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "732cf99d-57e3-4f44-a61d-baa9e48afd53",
+      "name": "Select Properties",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "61c741c2-f52f-406c-9333-3774a99ba1d6",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        -128
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Select Properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Properties": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "QE5myWmaQCmcCpAS",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "cf062e6f-7c41-4d2f-b8e1-a77a17e3bd10",
+  "meta": {
+    "instanceId": "9f5d08ab6b97d69e6449885599b8675d0accb23577b5b533e2108defda49fa46"
+  },
+  "id": "8LqZWvhPjD0f9wih",
+  "tags": []
+}

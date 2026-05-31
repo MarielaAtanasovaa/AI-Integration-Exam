@@ -1,0 +1,100 @@
+{
+  "name": "NovaDom - Error Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "41997015-e7ce-4460-a492-0636a8ff9552",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const e = $input.first().json;\nconst wf = e.workflow ? e.workflow.name : 'unknown';\nconst node = e.execution && e.execution.lastNodeExecuted ? e.execution.lastNodeExecuted : (e.node ? e.node.name : 'unknown');\nconst message = (e.execution && e.execution.error && e.execution.error.message) || (e.error && e.error.message) || 'Unknown error';\nreturn [{ json: { workflow_name: wf, node_name: node, message } }];"
+      },
+      "id": "5c91eb15-46a1-442b-a25d-22c514769b96",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/error_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow_name: $json.workflow_name, node_name: $json.node_name, message: $json.message }) }}",
+        "options": {}
+      },
+      "id": "7a0518ab-bb59-4f53-ba46-5a7366638aa2",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f9a4b921-9d8c-4de1-bb8c-0080bb6d3333",
+  "meta": {
+    "instanceId": "9f5d08ab6b97d69e6449885599b8675d0accb23577b5b533e2108defda49fa46"
+  },
+  "id": "QE5myWmaQCmcCpAS",
+  "tags": []
+}
