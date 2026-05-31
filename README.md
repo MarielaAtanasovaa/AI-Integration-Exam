@@ -18,13 +18,20 @@ answers questions over the catalogue using **Supabase MCP** (structured/numeric 
 ## Architecture
 
 ```
-React frontend (5173)  ──HTTP──▶  n8n webhooks (5679)            ──▶  Supabase + Gemini
-  Property Management              POST /webhook/add-listing             properties
-    Add listing · Catalogue        GET  /webhook/list-listings           inquiry_logs
-    Broker chat (role: broker)     POST /webhook/search  (semantic)      property_vectors (pgvector)
-  Buyer Search                     POST /webhook/chat    (AI Agent)      Storage: property-images
-    Semantic search box
-    Buyer chat (role: client)      AI Agent tools: Supabase MCP + Vector Store + Simple Memory
+Frontend (React, :5173)  ──HTTP──▶  n8n webhooks (:5679)  ──▶  Supabase + Gemini
+
+Property Management tab
+  Add listing form       → POST /webhook/add-listing   → properties + property_vectors + Storage (image)
+  Catalogue grid         → GET  /webhook/list-listings → properties
+  Broker chat (broker)   → POST /webhook/chat          → AI Agent
+
+Buyer Search tab
+  Semantic search box    → POST /webhook/search        → embed query → match property_vectors → inquiry_logs
+  Buyer chat (client)    → POST /webhook/chat          → AI Agent
+
+AI Agent (/webhook/chat): Google Gemini chat + Simple Memory + two tools:
+  • Supabase MCP   → structured / numeric / aggregate queries on properties & inquiry_logs
+  • Vector Store   → semantic matching over property_vectors (pgvector)
 ```
 
 All browser traffic goes through n8n — the frontend never holds Supabase keys. The buyer **search
